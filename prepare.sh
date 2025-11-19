@@ -47,37 +47,56 @@ if [ -d "build" ]; then
     rm -rf build/*
 fi
 
-for ARCHITECTURE in x86_64 aarch64 s390x ppc64le loongarch64; do
+for ARCHITECTURE in aarch64 armel armhf loongarch64 ppc64le riscv64 s390x x86_64; do
     cd "${BASE_DIR}" || exit 1
 
     case "${ARCHITECTURE}" in
-        "x86_64")
-            ARCH="amd64"
-            ;;
         "aarch64")
             ARCH="arm64"
+            ;;
+        "armel")
+            ARCH="armv6"
+            ;;
+        "armhf")
+            ARCH="armv7"
             ;;
         "loongarch64")
             ARCH="loong64"
             ;;
-        "s390x")
-            ARCH="s390x"
-            ;;
         "ppc64le")
             ARCH="ppc64le"
             ;;
+        "riscv64")
+            ARCH="riscv64"
+            ;;
+        "s390x")
+            ARCH="s390x"
+            ;;
+        "x86_64")
+            ARCH="amd64"
+            ;;
     esac
 
-    APP_BIN_URL="https://github.com/wojiushixiaobai/1Panel-loongarch64/releases/download/${APP_VERSION}/1panel-${APP_VERSION}-linux-${ARCH}.tar.gz"
+    APP_BIN_URL="https://github.com/wojiushixiaobai/1Panel/releases/download/${APP_VERSION}/1panel-${APP_VERSION}-linux-${ARCH}.tar.gz"
     DOCKER_BIN_URL="https://download.docker.com/linux/static/stable/${ARCHITECTURE}/docker-${DOCKER_VERSION}.tgz"
     COMPOSE_BIN_URL="https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${ARCHITECTURE}"
+
+    OFFLINE_BUILD=""
+
     case "${ARCHITECTURE}" in
-        "loongarch64")
-            DOCKER_BIN_URL="https://github.com/wojiushixiaobai/docker-ce-binaries-${ARCHITECTURE}/releases/download/v${DOCKER_VERSION}/docker-${DOCKER_VERSION}.tgz"
-            COMPOSE_BIN_URL="https://github.com/wojiushixiaobai/compose-${ARCHITECTURE}/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${ARCHITECTURE}"
+        "armel"|"armhf")
+            COMPOSE_BIN_URL="https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${ARCH}"
             ;;
-        "s390x"|"ppc64le")
+        "loongarch64")
+            DOCKER_BIN_URL="https://github.com/loong64/docker-ce-packaging/releases/download/v${DOCKER_VERSION}/docker-${DOCKER_VERSION}.tgz"
+            COMPOSE_BIN_URL="https://github.com/loong64/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${ARCHITECTURE}"
+            ;;
+        "riscv64")
             DOCKER_BIN_URL="https://github.com/wojiushixiaobai/docker-ce-binaries-${ARCHITECTURE}/releases/download/v${DOCKER_VERSION}/docker-${DOCKER_VERSION}.tgz"
+            ;;
+        "ppc64le"|"s390x")
+            DOCKER_BIN_URL="https://github.com/wojiushixiaobai/docker-ce-binaries-${ARCHITECTURE}/releases/download/v${DOCKER_VERSION}/docker-${DOCKER_VERSION}.tgz"
+            # OFFLINE_BUILD="false"
             ;;
     esac
 
@@ -97,24 +116,33 @@ for ARCHITECTURE in x86_64 aarch64 s390x ppc64le loongarch64; do
     rm -f "${BUILD_DIR}/install.sh"
     rm -f "${BUILD_OFFLINE_DIR}/install.sh"
 
-    if [ ! -f "${BUILD_OFFLINE_DIR}/docker.tgz" ]; then
+    if [ "${OFFLINE_BUILD}" != "false" ] && [ ! -f "${BUILD_OFFLINE_DIR}/docker.tgz" ]; then
         wget -q "${DOCKER_BIN_URL}" -O "${BUILD_OFFLINE_DIR}/docker.tgz"
     fi
 
+    if [ ! -f "${BUILD_DIR}/docker-compose" ]; then
+        wget -q "${COMPOSE_BIN_URL}" -O "${BUILD_DIR}/docker-compose"
+    fi
+
     if [ ! -f "${BUILD_OFFLINE_DIR}/docker-compose" ]; then
-        wget -q "${COMPOSE_BIN_URL}" -O "${BUILD_OFFLINE_DIR}/docker-compose"
+        cp -f "${BUILD_DIR}/docker-compose" "${BUILD_OFFLINE_DIR}/docker-compose"
     fi
 
     cp -f docker.service "${BUILD_DIR}"
     cp -f docker.service "${BUILD_OFFLINE_DIR}"
     cp -f install.sh "${BUILD_DIR}"
     cp -f install.sh "${BUILD_OFFLINE_DIR}"
+    sed -i 's@/usr/bin/1panel@/usr/local/bin/1panel@g' "${BUILD_DIR}/1panel.service"
+    sed -i 's@/usr/bin/1panel@/usr/local/bin/1panel@g' "${BUILD_OFFLINE_DIR}/1panel.service"
     chmod +x "${BUILD_OFFLINE_DIR}/docker-compose"
     chmod +x "${BUILD_DIR}/install.sh" "${BUILD_OFFLINE_DIR}/install.sh"
+    chown -R root:root "${BUILD_DIR}" "${BUILD_OFFLINE_DIR}"
 
     cd "build/${APP_VERSION}" || exit 1
     tar -zcf "${BUILD_NAME}.tar.gz" "${BUILD_NAME}"
-    tar -zcf "${BUILD_OFFLINE_NAME}.tar.gz" "${BUILD_OFFLINE_NAME}"
+    if [ "${OFFLINE_BUILD}" != "false" ]; then
+        tar -zcf "${BUILD_OFFLINE_NAME}.tar.gz" "${BUILD_OFFLINE_NAME}"
+    fi
 done
 
 cd "${BASE_DIR}/build/${APP_VERSION}" || exit 1

@@ -66,6 +66,7 @@ PANEL_USER=${PANEL_USER:-"admin"}
 PANEL_PASSWORD=${PANEL_PASSWORD:-""}
 PANEL_ENTRANCE=${PANEL_ENTRANCE:-"secret"}
 INSTALL_DIR=${INSTALL_DIR:-"/opt/1panel"}
+INSTALL_DIR=${INSTALL_DIR%/1panel}
 INSTALL_CHECK=0
 
 if [ -f "/usr/local/bin/1pctl" ] && [ "${INSTALL_CHECK}" == "0" ]; then
@@ -209,6 +210,10 @@ function install_1panel() {
     if [ ! -f "/etc/systemd/system/1panel.service" ]; then
         cp 1panel.service /etc/systemd/system
     fi
+    if grep -q "/usr/bin/1panel" /etc/systemd/system/1panel.service; then
+        sed -i 's@/usr/bin/1panel@/usr/local/bin/1panel@g' /etc/systemd/system/1panel.service
+    fi
+    cp -rf lang /usr/local/bin
     cp -f 1panel /usr/local/bin
     chown root:root /usr/local/bin/1panel
     chmod 700 /usr/local/bin/1panel
